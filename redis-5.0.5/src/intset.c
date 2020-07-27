@@ -132,8 +132,9 @@ static uint8_t intsetSearch(intset *is, int64_t value, uint32_t *pos) {
         }
     }
 
+    // 其实就是实现了一个二分查找
     while(max >= min) {
-        mid = ((unsigned int)min + (unsigned int)max) >> 1;
+        mid = ((unsigned int)min + (unsigned int)max) >> 1; // 通过移位的方式取索引的中位数？
         cur = _intsetGet(is,mid);
         if (value > cur) {
             min = mid+1;
@@ -162,19 +163,20 @@ static intset *intsetUpgradeAndAdd(intset *is, int64_t value) {
 
     /* First set new encoding and resize */
     is->encoding = intrev32ifbe(newenc);
-    is = intsetResize(is,intrev32ifbe(is->length)+1);
+    is = intsetResize(is,intrev32ifbe(is->length)+1); // 根据新数据的编码，重新分配整数集合的内存大小
 
     /* Upgrade back-to-front so we don't overwrite values.
      * Note that the "prepend" variable is used to make sure we have an empty
      * space at either the beginning or the end of the intset. */
     while(length--)
+        // 将整数集合中对应位置的值取出，然后重新查询整数集合对应的位置。新位置其实是按照新的encoding决定的
         _intsetSet(is,length+prepend,_intsetGetEncoded(is,length,curenc));
 
     /* Set the value at the beginning or the end. */
     if (prepend)
-        _intsetSet(is,0,value);
+        _intsetSet(is,0,value); // 将值插入到第一个
     else
-        _intsetSet(is,intrev32ifbe(is->length),value);
+        _intsetSet(is,intrev32ifbe(is->length),value); // 将值插入到最后一个
     is->length = intrev32ifbe(intrev32ifbe(is->length)+1);
     return is;
 }
@@ -202,7 +204,7 @@ static void intsetMoveTail(intset *is, uint32_t from, uint32_t to) {
 
 /* Insert an integer in the intset */
 intset *intsetAdd(intset *is, int64_t value, uint8_t *success) {
-    uint8_t valenc = _intsetValueEncoding(value);
+    uint8_t valenc = _intsetValueEncoding(value);// 返回value的编码类型
     uint32_t pos;
     if (success) *success = 1;
 
@@ -211,20 +213,27 @@ intset *intsetAdd(intset *is, int64_t value, uint8_t *success) {
      * because it lies outside the range of existing values. */
     if (valenc > intrev32ifbe(is->encoding)) {
         /* This always succeeds, so we don't need to curry *success. */
+        // 如果value的编码类型比当前整数集合的编码类型需要的存储空间更大，则需要扩展
+        // 如果value小于0，则说明改值小于现有contents中的最小值，需要插入到最前面
+        // 如果value大于0,则说明该值大于现有contents中的最大值，需要插入到最后
         return intsetUpgradeAndAdd(is,value);
     } else {
         /* Abort if the value is already present in the set.
          * This call will populate "pos" with the right position to insert
          * the value when it cannot be found. */
+        // 编码类型没变则不需要进行扩展。查找需要插入的位置
         if (intsetSearch(is,value,&pos)) {
             if (success) *success = 0;
             return is;
         }
 
+        // 扩展内存空间
         is = intsetResize(is,intrev32ifbe(is->length)+1);
+        // 将插入位置后的数据向后挪动
         if (pos < intrev32ifbe(is->length)) intsetMoveTail(is,pos,pos+1);
     }
 
+    // 将数据插入到指定的位置
     _intsetSet(is,pos,value);
     is->length = intrev32ifbe(intrev32ifbe(is->length)+1);
     return is;
