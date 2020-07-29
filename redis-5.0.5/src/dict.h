@@ -52,33 +52,48 @@ typedef struct dictEntry {
         int64_t s64;
         double d;
     } v;
-    struct dictEntry *next;
+    struct dictEntry *next; // 链表的结构解决冲突。每个字典的节点都存在指向相同KEY的下一个字典节点的指针。
 } dictEntry;
 
+// 用来保存字典相关的方法。
 typedef struct dictType {
+    // 哈希算法
     uint64_t (*hashFunction)(const void *key);
+
+    // 复制字典的键
     void *(*keyDup)(void *privdata, const void *key);
+
+    // 复制字典的值
     void *(*valDup)(void *privdata, const void *obj);
+
+    // 字典键比较
     int (*keyCompare)(void *privdata, const void *key1, const void *key2);
+
+    // 销毁字典的键
     void (*keyDestructor)(void *privdata, void *key);
+
+    // 销毁字典的值
     void (*valDestructor)(void *privdata, void *obj);
 } dictType;
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
+
+//哈希表
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+    dictEntry **table; 
+    unsigned long size; // 哈希表的大小（槽的数量）
+    unsigned long sizemask; // 计算索引使用的掩码
+    unsigned long used; // 已经使用的槽
 } dictht;
 
+// 字典
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    unsigned long iterators; /* number of iterators currently running */
+    dictType *type; // 保存字典的相关处理方法
+    void *privdata; // 私有数据？
+    dictht ht[2]; // 2张哈希表。用于rehash操作
+    long rehashidx; /* rehash操作的索引值。-1 表示未进行rehash操作。 0 表示开始rehash操作。大于0 表示当前正在进行rehash的节点索引。rehashing not in progress if rehashidx == -1 */ 
+    unsigned long iterators; /* 当前正在迭代该字典的迭代器数量。number of iterators currently running */
 } dict;
 
 /* If safe is set to 1 this is a safe iterator, that means, you can call
@@ -86,8 +101,8 @@ typedef struct dict {
  * iterating. Otherwise it is a non safe iterator, and only dictNext()
  * should be called while iterating. */
 typedef struct dictIterator {
-    dict *d;
-    long index;
+    dict *d; // 当前正在迭代的字典
+    long index; 
     int table, safe;
     dictEntry *entry, *nextEntry;
     /* unsafe iterator fingerprint for misuse detection. */
